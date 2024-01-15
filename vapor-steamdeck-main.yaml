@@ -1,0 +1,129 @@
+{{- $image := or .image "vapor-steamdeck-main.img" -}}
+
+architecture: amd64
+
+actions:
+  - action: pacstrap
+    config: overlay/pacman.jupiter.cached.conf
+    mirror: overlay/mirrorlist.cached
+
+  - action: run
+    chroot: false
+    command: cp $RECIPEDIR/overlay/pacman.jupiter.cached.conf $ROOTDIR/etc/pacman.conf
+
+  - action: run
+    chroot: false
+    command: cp $RECIPEDIR/overlay/mirrorlist.cached $ROOTDIR/etc/pacman.d/mirrorlist
+
+  - action: pacman
+    packages: [ amd-ucode, arch-install-scripts, ark, base, bash-bats, bash-completion, bluez-plugins, bluez-utils, breeze-grub, btop, btrfs-progs, caps, casync, cpupower, desync, distrobox, dolphin, dos2unix, dosfstools, drm_info, ds-inhibit, efibootmgr, evtest, exfat-utils, f3, fatresize, fd, fish, flatpak, flatpak-kcm, fuse-overlayfs, galileo-mura, gamemode, gamescope, gpu-trace, grub, gwenview, holo-desync, holo-dmi-rules, holo-fstab-repair, holo-keyring, holo-nix-offload, holo-sudo, htop, ibus, ibus-anthy, ibus-hangul, ibus-pinyin, ibus-table, ibus-table-cangjie-lite, iotop, iw, iwd, jupiter-dock-updater-bin, jupiter-fan-control, jupiter-firewall, jupiter-hw-support, jupiter-legacy-support, jupiter-resolved-nomdns, jupiter-steamos-log-submitter, kate, kdeconnect, kitty-terminfo, konsole, lib32-gamemode, lib32-gamescope, lib32-libnm, lib32-libpulse, lib32-libva, lib32-libva-mesa-driver, lib32-libvdpau, lib32-mangohud, lib32-mesa-vdpau, lib32-openal, lib32-renderdoc-minimal, lib32-vulkan-radeon, libcec, libva-intel-driver, libva-mesa-driver, linux-firmware-neptune, linux-neptune-61, maliit-keyboard, mandoc, mangohud, mesa-utils, mesa-vdpau, mkinitcpio, nano, ncdu, nethogs, networkmanager-openvpn, nfs-utils, noise-suppression-for-voice, noto-fonts, noto-fonts-cjk, nss-mdns, ntfs-3g, okular, openssh, openvpn, p7zip, partitionmanager, paru, pavucontrol, pipewire, pipewire-alsa, pipewire-jack, pipewire-pulse, plasma-meta, plasma-remotecontrollers, plasma-wayland-protocols, plasma-wayland-session, podman, powertop, qt5-tools, renderdoc-minimal, ripgrep, rtkit, rxvt-unicode-terminfo, sddm-wayland, spectacle, squashfs-tools, sshfs, steam-im-modules, steam-jupiter-stable, steam_notif_daemon, steamdeck-dsp, steamdeck-kde-presets, steamos-customizations-jupiter, steamos-devkit-service, steamos-efi, steamos-kdumpst-layer, steamos-reset, steamos-systemreport, steamos-tweak-mtu-probing, strace, sudo, systemd-swap, tk, tmux, tree, ttf-dejavu, ttf-twemoji-default, unrar, unzip, usbhid-gadget-passthru, vim, vkmark-git, vpower, vulkan-radeon, wget, which, wireguard-tools, wireless-regdb, wireless_tools, wireplumber, xbindkeys, xdg-desktop-portal-kde, xdotool, xf86-video-amdgpu, xorg-xdpyinfo, xorg-xhost, xorg-xrandr, xorg-xwayland-jupiter, xorg-xwininfo, xterm, zip, zsh ]
+
+  - action: run
+    description: Set hostname
+    chroot: true
+    command: echo vapor > /etc/hostname
+
+  - action: run
+    description: Set up services
+    chroot: true
+    script: scripts/setup-services.sh
+
+  - action: run
+    description: Set up user
+    chroot: true
+    script: scripts/setup-user.sh
+
+  - action: run
+    chroot: false
+    command: cp $RECIPEDIR/overlay/fstab $ROOTDIR/etc/fstab
+
+  - action: run
+    chroot: false
+    command: cp $RECIPEDIR/overlay/pacman.jupiter.main.conf $ROOTDIR/etc/pacman.conf
+
+  - action: run
+    chroot: false
+    command: cp $RECIPEDIR/overlay/mirrorlist $ROOTDIR/etc/pacman.d/mirrorlist
+
+  - action: run
+    description: Clear pacman cache
+    chroot: true
+    command: rm -r /var/cache/pacman/pkg
+
+  - action: run
+    description: Set up factory
+    chroot: true
+    script: scripts/factory-hack.sh
+
+  - action: image-partition
+    imagename: {{ $image }}
+    imagesize: 8GB
+    partitiontype: gpt
+    mountpoints:
+      - mountpoint: /esp
+        partition: esp
+      - mountpoint: /efi
+        partition: efi
+      - mountpoint: /
+        partition: rootfs
+      - mountpoint: /var
+        partition: var
+      - mountpoint: /home
+        partition: home
+    partitions:
+      - name: esp
+        fs: fat32
+        start: 0%
+        end: 67MB
+        flags: [ boot ]
+      - name: efi
+        partlabel: efi-A
+        fs: fat32
+        start: 67MB
+        end: 201MB
+        parttype: EBD0A0A2-B9E5-4433-87C0-68B6B72699C7
+      - name: rootfs
+        partlabel: rootfs-A
+        fs: btrfs
+        start: 201MB
+        end: 5569MB
+        parttype: 4F68BCE3-E8CD-4DB1-96E7-FBCAF984B709
+      - name: var
+        partlabel: var-A
+        fs: ext4
+        start: 5569MB
+        end: 5837MB
+        parttype: 4D21B016-B534-45C2-A9FB-5C16E091FD2D
+      - name: home
+        fs: ext4
+        start: 5837MB
+        end: 100%
+        parttype: 933AC7E1-2EB4-4F13-B844-0E14E2AEF915
+
+  - action: run
+    chroot: false
+    command: mount -o remount,compress=zstd:12 /scratch/mnt
+
+  - action: filesystem-deploy
+    description: Deploying filesystem onto image
+    setup-fstab: false
+
+  - action: run
+    description: Create partsets
+    chroot: true
+    command: steamos-partsets /efi/SteamOS/partsets
+
+  - action: run
+    description: Finalize install
+    chroot: true
+    script: scripts/finalize-install.sh
+
+  - action: run
+    description: Create block map file
+    postprocess: true
+    command: bmaptool create {{ $image }} > custom/{{ $image }}.bmap
+
+  - action: run
+    description: Compressing final image
+    postprocess: true
+    command: zip -8 custom/{{ $image }}.zip {{ $image }}
