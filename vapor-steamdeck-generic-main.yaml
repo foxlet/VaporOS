@@ -34,6 +34,11 @@ actions:
     script: scripts/setup-user.sh
 
   - action: run
+    description: Enable kernel vebosity [dev]
+    chroot: false
+    command: cp $RECIPEDIR/overlay/dev/00_header $ROOTDIR/etc/grub.d/
+
+  - action: run
     chroot: false
     command: cp $RECIPEDIR/overlay/fstab $ROOTDIR/etc/fstab
 
@@ -54,6 +59,11 @@ actions:
     description: Set up factory
     chroot: true
     script: scripts/factory-hack.sh
+
+  - action: run
+    description: Set up dev options [dev]
+    chroot: false
+    script: scripts/setup-dev.sh
 
   - action: image-partition
     imagename: {{ $image }}
